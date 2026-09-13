@@ -1,0 +1,4 @@
+/target/
+__pycache__/
+*.exe
+.DS_Store

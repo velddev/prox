@@ -1,0 +1,48 @@
+name: Build and test
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact: prox-windows-x64
+            executable: prox.exe
+          - os: macos-latest
+            artifact: prox-macos-arm64
+            executable: prox
+          - os: ubuntu-latest
+            artifact: prox-linux-x64
+            executable: prox
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - run: cargo fmt --check
+      - run: cargo clippy --locked --all-targets -- -D warnings
+      - run: cargo test --locked
+      - run: cargo build --release --locked
+      - run: python -u tests/smoke.py target/release/${{ matrix.executable }}
+        timeout-minutes: 2
+      - run: python -u tests/install.py target/release/${{ matrix.executable }}
+        timeout-minutes: 2
+      - run: python -u tests/environments.py target/release/${{ matrix.executable }}
+        timeout-minutes: 2
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: target/release/${{ matrix.executable }}
+          if-no-files-found: error
